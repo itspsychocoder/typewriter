@@ -1,0 +1,40 @@
+[
+  {
+    "id": "section-1",
+    "name": "Work",
+    "isOpen": true,
+    "notes": [
+      {
+        "id": "note-1",
+        "title": "Project Ideas",
+        "content": "1. Create a new dashboard\n2. Implement dark mode\n3. Add analytics",
+        "lastEdited": "2025-04-20T07:58:18.442Z"
+      },
+      {
+        "id": "note-2",
+        "title": "Meeting Notes",
+        "content": "Discussed timeline for Q3 projects and assigned tasks to team members.",
+        "lastEdited": "2025-04-20T07:58:18.442Z"
+      }
+    ]
+  },
+  {
+    "id": "section-2",
+    "name": "Personal",
+    "isOpen": true,
+    "notes": [
+      {
+        "id": "note-3",
+        "title": "Shopping List",
+        "content": "- Milk\n- Eggs\n- Bread\n- Apples",
+        "lastEdited": "2025-04-20T07:58:18.442Z"
+      },
+      {
+        "id": "note-1745135936611",
+        "title": "Test",
+        "content": "This is test note",
+        "lastEdited": "2025-04-20T07:59:03.941Z"
+      }
+    ]
+  }
+]
