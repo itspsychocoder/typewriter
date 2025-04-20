@@ -1,0 +1,30 @@
+{
+  "name": "typewriter",
+  "version": "1.0.0",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "electron .",
+    "dev": "concurrently \"npm run dev --prefix renderer\" \"wait-on http://localhost:5173 && electron .\""
+
+
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/itspsychocoder/typewriter.git"
+  },
+  "author": "Psycho Coder",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/itspsychocoder/typewriter/issues"
+  },
+  "homepage": "https://github.com/itspsychocoder/typewriter#readme",
+  "description": "",
+  "devDependencies": {
+    "electron": "^35.2.0"
+  },
+  "dependencies": {
+    "concurrently": "^9.1.2",
+    "wait-on": "^8.0.3"
+  }
+}
