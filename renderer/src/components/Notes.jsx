@@ -5,6 +5,8 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Textarea } from "@/components/ui/textarea"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { cn } from "@/lib/utils"
+import LexicalEditor from "./LexicalEditor"
+import '../styles/lexical.css' // Import Lexical styles
 
 export default function NotesApp() {
   // Sidebar resizing
@@ -87,7 +89,7 @@ export default function NotesApp() {
     if (section) {
       await window.electron.dbUpdateSection(sectionId, { is_open: !section.isOpen });
       setSections(
-        sections.map((section) => 
+        sections.map((section) =>
           section.id === sectionId ? { ...section, isOpen: !section.isOpen } : section
         )
       )
@@ -147,8 +149,11 @@ export default function NotesApp() {
       const updatedNote = { ...activeNote, content, lastEdited: new Date() }
       setActiveNote(updatedNote)
 
-      // Update in database
-      await window.electron.dbUpdateNote(activeNote.id, { content });
+      // Update in database with debouncing to avoid too many saves
+      clearTimeout(updateNoteContent.timeout);
+      updateNoteContent.timeout = setTimeout(async () => {
+        await window.electron.dbUpdateNote(activeNote.id, { content });
+      }, 500);
 
       setSections(
         sections.map((section) => ({
@@ -162,7 +167,7 @@ export default function NotesApp() {
   // Function to delete a note
   const deleteNote = async (noteId) => {
     const result = await window.electron.dbDeleteNote(noteId);
-    
+
     if (result.success) {
       setSections(
         sections.map((section) => ({
@@ -180,7 +185,7 @@ export default function NotesApp() {
   // Function to delete a section
   const deleteSection = async (sectionId) => {
     const result = await window.electron.dbDeleteSection(sectionId);
-    
+
     if (result.success) {
       setSections(sections.filter((section) => section.id !== sectionId))
 
@@ -350,7 +355,7 @@ export default function NotesApp() {
       <div className="w-full flex flex-col h-full">
         {activeNote ? (
           <>
-            <div className="p-4 w-[70vw] border-b flex justify-between items-center">
+            <div className="p-4 border-b flex justify-between items-center">
               <h2 className="text-xl font-semibold">{activeNote.title}</h2>
               <div className="flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">
@@ -359,12 +364,13 @@ export default function NotesApp() {
               </div>
             </div>
 
-            <div className="flex-1 p-4 overflow-auto">
-              <Textarea
-                value={activeNote.content}
-                onChange={(e) => updateNoteContent(e.target.value)}
-                className="w-full h-full min-h-[calc(100vh-200px)] resize-none border-0 focus-visible:ring-0 p-0 bg-background"
-                placeholder="Start writing..."
+            <div className="flex-1 overflow-hidden">
+              <LexicalEditor
+                key={activeNote.id}
+                noteId={activeNote.id}
+                initialContent={activeNote.content}
+                onChange={updateNoteContent}
+                placeholder="Start writing your note..."
               />
             </div>
 

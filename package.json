@@ -7,7 +7,6 @@
     "start": "electron .",
     "dev": "concurrently \"npm run dev --prefix renderer\" \"wait-on http://localhost:5173 && electron .\"",
     "postinstall": "electron-rebuild"
-
   },
   "repository": {
     "type": "git",
@@ -25,8 +24,19 @@
   },
   "dependencies": {
     "@electron/rebuild": "^4.0.1",
+    "@lexical/code": "^0.33.1",
+    "@lexical/html": "^0.33.1",
+    "@lexical/link": "^0.33.1",
+    "@lexical/list": "^0.33.1",
+    "@lexical/mark": "^0.33.1",
+    "@lexical/plain-text": "^0.33.1",
+    "@lexical/react": "^0.33.1",
+    "@lexical/rich-text": "^0.33.1",
+    "@lexical/table": "^0.33.1",
+    "@lexical/utils": "^0.33.1",
     "better-sqlite3": "^12.2.0",
     "concurrently": "^9.1.2",
+    "lexical": "^0.33.1",
     "wait-on": "^8.0.3"
   }
 }

@@ -89,6 +89,7 @@ ipcMain.handle('db-create-note', async (event, id, sectionId, title, content) =>
 ipcMain.handle('db-update-note', async (event, id, updates) => {
   try {
     dbManager.updateNote(id, updates);
+    console.log(`Note with ID ${id} updated successfully.`);
     return { success: true };
   } catch (error) {
     return { success: false, error: error.message };
