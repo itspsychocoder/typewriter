@@ -19,5 +19,9 @@ contextBridge.exposeInMainWorld('electron', {
    // Fullscreen APIs
    toggleFullscreen: () => ipcRenderer.invoke('toggle-fullscreen'),
    isFullscreen: () => ipcRenderer.invoke('is-fullscreen'),
-   exitFullscreen: () => ipcRenderer.invoke('exit-fullscreen') 
+   exitFullscreen: () => ipcRenderer.invoke('exit-fullscreen'),
+   
+   // File operations
+  saveFile: (filename, content) => ipcRenderer.invoke('save-file', filename, content)
+
 });

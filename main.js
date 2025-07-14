@@ -1,22 +1,71 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron')
-const fs = require('fs')
+const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron')
+const fs = require('fs').promises // Changed to promises for async operations
 const path = require('path')
 
-const DatabaseManager = require('./database/DatabaseManager') // Add this line
+const DatabaseManager = require('./database/DatabaseManager')
 
-let mainWindow;
+let mainWindow; // This will hold our window reference
 let dbManager;
-const createWindow = () => {
-  const win = new BrowserWindow({
-    width: 800,
-    height: 600,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'), // Preload script for renderer process communication
-      nodeIntegration: true
-    }
-  })
 
-  win.loadURL('http://localhost:5173') // This assumes you're using Vite for your frontend
+const createWindow = () => {
+  mainWindow = new BrowserWindow({
+    width: 1200,
+    height: 800,
+    minWidth: 800,
+    minHeight: 600,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      enableRemoteModule: false,
+      preload: path.join(__dirname, 'preload.js'),
+      webSecurity: false
+    },
+    titleBarStyle: 'default',
+    show: false
+  });
+
+  const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+  
+  // Set up menu based on environment
+  if (isDev) {
+    // Keep default menu in development
+    mainWindow.loadURL('http://localhost:5173');
+    mainWindow.webContents.openDevTools();
+  } else {
+    // Create minimal menu for production or no menu at all
+    const template = [
+      {
+        label: 'File',
+        submenu: [
+          {
+            label: 'Quit',
+            accelerator: process.platform === 'darwin' ? 'Cmd+Q' : 'Ctrl+Q',
+            click: () => {
+              app.quit();
+            }
+          }
+        ]
+      }
+    ];
+
+    const menu = Menu.buildFromTemplate(template);
+    Menu.setApplicationMenu(menu);
+    
+    // Or completely remove menu:
+    // Menu.setApplicationMenu(null);
+    
+    const indexPath = path.join(__dirname, 'renderer', 'dist', 'index.html');
+    mainWindow.loadFile(indexPath).catch(err => {
+      console.error('Failed to load:', err);
+      mainWindow.loadURL('data:text/html,<h1>TypeWriter</h1><p>Error loading app: ' + err.message + '</p>');
+    });
+  }
+
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show();
+  });
+
+  return mainWindow;
 }
 
 // Database operations
@@ -105,9 +154,8 @@ ipcMain.handle('db-delete-note', async (event, id) => {
   }
 });
 
-// Add fullscreen handlers
+// Add fullscreen handlers - Fix: Use mainWindow variable
 ipcMain.handle('toggle-fullscreen', () => {
-  const mainWindow = BrowserWindow.getFocusedWindow();
   if (mainWindow) {
     const isFullScreen = mainWindow.isFullScreen();
     mainWindow.setFullScreen(!isFullScreen);
@@ -117,12 +165,10 @@ ipcMain.handle('toggle-fullscreen', () => {
 });
 
 ipcMain.handle('is-fullscreen', () => {
-  const mainWindow = BrowserWindow.getFocusedWindow();
   return mainWindow ? mainWindow.isFullScreen() : false;
 });
 
 ipcMain.handle('exit-fullscreen', () => {
-  const mainWindow = BrowserWindow.getFocusedWindow();
   if (mainWindow && mainWindow.isFullScreen()) {
     mainWindow.setFullScreen(false);
     return true;
@@ -130,6 +176,30 @@ ipcMain.handle('exit-fullscreen', () => {
   return false;
 });
 
+// Add file save functionality - Fix: Use proper fs.promises
+ipcMain.handle('save-file', async (event, filename, content) => {
+  try {
+    const { filePath } = await dialog.showSaveDialog(mainWindow, {
+      defaultPath: filename,
+      filters: [
+        { name: 'All Files', extensions: ['*'] },
+        { name: 'Markdown', extensions: ['md'] },
+        { name: 'HTML', extensions: ['html'] },
+        { name: 'Text', extensions: ['txt'] }
+      ]
+    });
+    
+    if (filePath) {
+      // Fix: Use fs.promises.writeFile
+      await fs.writeFile(filePath, content, 'utf8');
+      return { success: true, path: filePath };
+    }
+    
+    return { success: false, error: 'Save cancelled' };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
 
 app.whenReady().then(() => {
   createWindow()

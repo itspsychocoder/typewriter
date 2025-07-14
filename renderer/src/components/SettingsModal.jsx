@@ -330,20 +330,24 @@ export default function SettingsModal({
 
           {/* About */}
           <Card>
-            <CardHeader>
-              <CardTitle>About TypeWriter</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary">Version 1.0.0</Badge>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  A modern, distraction-free writing application built with Electron and React.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+  <CardHeader>
+    <CardTitle>About TypeWriter</CardTitle>
+  </CardHeader>
+  <CardContent>
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <Badge variant="secondary">Version 1.0.0</Badge>
+      </div>
+      <p className="text-sm text-muted-foreground">
+        A modern, distraction-free writing & notes application.
+      </p>
+      <p className="text-sm">
+        <span className="font-medium">Developer:</span>{" "}
+        <span className="text-muted-foreground">Psycho Coder</span>
+      </p>
+    </div>
+  </CardContent>
+</Card>
         </div>
       </DialogContent>
     </Dialog>
