@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react"
-import { PlusCircle, FileText, Folder, ChevronDown, ChevronRight, Save, Trash2, Maximize, Minimize } from "lucide-react"
+import { PlusCircle, FileText, Folder, ChevronDown, ChevronRight, Save, Trash2, Maximize, Minimize, Settings } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Textarea } from "@/components/ui/textarea"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { cn } from "@/lib/utils"
 import LexicalEditor from "./LexicalEditor"
+import SettingsModal from "./SettingsModal"
 import '../styles/lexical.css' // Import Lexical styles
 
 export default function NotesApp() {
@@ -18,6 +19,11 @@ export default function NotesApp() {
   // Focus mode state
   const [isFocusMode, setIsFocusMode] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
+
+  // Settings state
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [theme, setTheme] = useState("system")
+  const [fontSize, setFontSize] = useState("medium")
 
   // State
   const [sections, setSections] = useState([])
@@ -43,6 +49,31 @@ export default function NotesApp() {
     };
     checkFullscreen();
   }, []);
+
+  // Theme effect
+  useEffect(() => {
+    const root = window.document.documentElement
+    
+    if (theme === "system") {
+      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
+      root.classList.toggle("dark", systemTheme === "dark")
+    } else {
+      root.classList.toggle("dark", theme === "dark")
+    }
+  }, [theme])
+
+  // Font size effect
+  useEffect(() => {
+    const fontSizeMap = {
+      small: "14px",
+      medium: "16px",
+      large: "18px",
+      xl: "20px"
+    }
+    
+    const root = document.documentElement
+    root.style.setProperty('--editor-font-size', fontSizeMap[fontSize])
+  }, [fontSize])
 
   const initializeApp = async () => {
     try {
@@ -304,7 +335,20 @@ export default function NotesApp() {
       {!isFocusMode && (
         <>
           <div className="border-r flex flex-col h-full bg-background" style={{ width: `${sidebarWidth}px`, flexShrink: 0 }}>
-            <div className="p-2">
+            {/* Sidebar Header */}
+            <div className="p-2 border-b">
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="font-semibold">TypeWriter</h2>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  onClick={() => setIsSettingsOpen(true)}
+                >
+                  <Settings className="h-4 w-4" />
+                  <span className="sr-only">Settings</span>
+                </Button>
+              </div>
               <Button variant="ghost" className="w-full justify-start" onClick={() => setIsAddingSection(true)}>
                 <PlusCircle className="h-4 w-4 mr-2" />
                 Add Section
@@ -405,7 +449,10 @@ export default function NotesApp() {
                               "flex items-center justify-between p-2 rounded-md cursor-pointer hover:bg-muted group",
                               activeNote?.id === note.id && "bg-muted",
                             )}
-                            onClick={() => setActiveNote(note)}
+                            onClick={() => {
+                              setActiveNote(note)
+                              console.log(note)
+                            }}
                           >
                             <div className="flex items-center">
                               <FileText className="h-4 w-4 mr-2 text-muted-foreground" />
@@ -511,7 +558,7 @@ export default function NotesApp() {
             )}
           </>
         ) : (
-          <div className="flex items-center justify-center h-full text-muted-foreground">
+          <div className="flex items-center justify-center h-full text-muted-foreground w-[75vw]">
             <div className="text-center">
               <FileText className="h-12 w-12 mx-auto mb-4 opacity-20" />
               <h3 className="text-lg font-medium">No note selected</h3>
@@ -520,6 +567,18 @@ export default function NotesApp() {
           </div>
         )}
       </div>
+
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onOpenChange={setIsSettingsOpen}
+        theme={theme}
+        onThemeChange={setTheme}
+        fontSize={fontSize}
+        onFontSizeChange={setFontSize}
+        sections={sections}
+        activeNote={activeNote}
+      />
     </div>
   )
 }
