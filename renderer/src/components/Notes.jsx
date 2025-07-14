@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { PlusCircle, FileText, Folder, ChevronDown, ChevronRight, Save, Trash2 } from "lucide-react"
+import { PlusCircle, FileText, Folder, ChevronDown, ChevronRight, Save, Trash2, Maximize, Minimize } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Textarea } from "@/components/ui/textarea"
@@ -15,6 +15,10 @@ export default function NotesApp() {
   const minWidth = 180
   const maxWidth = 500
 
+  // Focus mode state
+  const [isFocusMode, setIsFocusMode] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+
   // State
   const [sections, setSections] = useState([])
   const [activeNote, setActiveNote] = useState(null)
@@ -27,6 +31,17 @@ export default function NotesApp() {
   // Initialize database and load data
   useEffect(() => {
     initializeApp();
+  }, []);
+
+  // Check initial fullscreen state
+  useEffect(() => {
+    const checkFullscreen = async () => {
+      if (window.electron?.isFullscreen) {
+        const fullscreenState = await window.electron.isFullscreen();
+        setIsFullscreen(fullscreenState);
+      }
+    };
+    checkFullscreen();
   }, []);
 
   const initializeApp = async () => {
@@ -82,6 +97,77 @@ export default function NotesApp() {
       window.removeEventListener("mouseup", stopResizing)
     }
   }, [isResizing])
+
+  // Toggle focus mode with true fullscreen
+  const toggleFocusMode = async () => {
+    if (!isFocusMode) {
+      // Entering focus mode - go fullscreen
+      if (window.electron?.toggleFullscreen) {
+        const newFullscreenState = await window.electron.toggleFullscreen();
+        setIsFullscreen(newFullscreenState);
+        setIsFocusMode(true);
+      } else {
+        // Fallback for development or if API not available
+        setIsFocusMode(true);
+      }
+    } else {
+      // Exiting focus mode - exit fullscreen
+      if (window.electron?.exitFullscreen) {
+        await window.electron.exitFullscreen();
+        setIsFullscreen(false);
+        setIsFocusMode(false);
+      } else {
+        // Fallback
+        setIsFocusMode(false);
+      }
+    }
+  }
+
+  // Handle ESC key to exit focus mode and fullscreen
+  useEffect(() => {
+    const handleKeyDown = async (e) => {
+      if (e.key === 'Escape' && (isFocusMode || isFullscreen)) {
+        if (window.electron?.exitFullscreen) {
+          await window.electron.exitFullscreen();
+        }
+        setIsFullscreen(false);
+        setIsFocusMode(false);
+      }
+      // Handle F11 key for manual fullscreen toggle
+      if (e.key === 'F11') {
+        e.preventDefault();
+        if (window.electron?.toggleFullscreen) {
+          const newFullscreenState = await window.electron.toggleFullscreen();
+          setIsFullscreen(newFullscreenState);
+          // If we're in focus mode and exiting fullscreen, exit focus mode too
+          if (!newFullscreenState && isFocusMode) {
+            setIsFocusMode(false);
+          }
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isFocusMode, isFullscreen])
+
+  // Listen for fullscreen changes from the window controls
+  useEffect(() => {
+    const handleFullscreenChange = async () => {
+      if (window.electron?.isFullscreen) {
+        const fullscreenState = await window.electron.isFullscreen();
+        setIsFullscreen(fullscreenState);
+        // If exiting fullscreen while in focus mode, exit focus mode
+        if (!fullscreenState && isFocusMode) {
+          setIsFocusMode(false);
+        }
+      }
+    };
+
+    // Check periodically for fullscreen state changes
+    const interval = setInterval(handleFullscreenChange, 1000);
+    return () => clearInterval(interval);
+  }, [isFocusMode]);
 
   // Function to toggle section collapse
   const toggleSection = async (sectionId) => {
@@ -213,158 +299,200 @@ export default function NotesApp() {
   }
 
   return (
-    <div className="flex h-screen bg-background">
-      {/* Left sidebar with sections and notes */}
-      <div className="border-r flex flex-col h-full bg-background" style={{ width: `${sidebarWidth}px` }}>
-        <div className="p-2">
-          <Button variant="ghost" className="w-full justify-start" onClick={() => setIsAddingSection(true)}>
-            <PlusCircle className="h-4 w-4 mr-2" />
-            Add Section
-          </Button>
-        </div>
-
-        {isAddingSection && (
-          <div className="px-2 pb-2">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={newSectionName}
-                onChange={(e) => setNewSectionName(e.target.value)}
-                placeholder="Section name"
-                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                onKeyDown={(e) => e.key === "Enter" && addSection()}
-              />
-              <Button size="sm" onClick={addSection}>
-                Add
+    <div className={cn("flex h-screen bg-background", (isFocusMode || isFullscreen) && "focus-mode")}>
+      {/* Left sidebar with sections and notes - Hide in focus mode */}
+      {!isFocusMode && (
+        <>
+          <div className="border-r flex flex-col h-full bg-background" style={{ width: `${sidebarWidth}px`, flexShrink: 0 }}>
+            <div className="p-2">
+              <Button variant="ghost" className="w-full justify-start" onClick={() => setIsAddingSection(true)}>
+                <PlusCircle className="h-4 w-4 mr-2" />
+                Add Section
               </Button>
             </div>
-          </div>
-        )}
 
-        <ScrollArea className="flex-1">
-          <div className="p-2 space-y-2">
-            {sections.map((section) => (
-              <Collapsible
-                key={section.id}
-                open={section.isOpen}
-                onOpenChange={() => toggleSection(section.id)}
-                className="border rounded-md"
-              >
-                <div className="flex items-center justify-between p-2">
-                  <CollapsibleTrigger asChild>
-                    <Button variant="ghost" size="sm" className="p-1 h-auto">
-                      {section.isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                    </Button>
-                  </CollapsibleTrigger>
-
-                  <div className="font-medium flex-1 flex items-center">
-                    <Folder className="h-4 w-4 mr-2 text-muted-foreground" />
-                    {section.name}
-                  </div>
-
-                  <div className="flex">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="p-1 h-auto"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setIsAddingNote(section.id)
-                      }}
-                    >
-                      <PlusCircle className="h-4 w-4" />
-                      <span className="sr-only">Add note</span>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="ml-3 p-1 h-auto text-destructive"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        deleteSection(section.id)
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      <span className="sr-only">Delete section</span>
-                    </Button>
-                  </div>
+            {isAddingSection && (
+              <div className="px-2 pb-2">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newSectionName}
+                    onChange={(e) => setNewSectionName(e.target.value)}
+                    placeholder="Section name"
+                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                    onKeyDown={(e) => e.key === "Enter" && addSection()}
+                  />
+                  <Button size="sm" onClick={addSection}>
+                    Add
+                  </Button>
                 </div>
+              </div>
+            )}
 
-                <CollapsibleContent>
-                  {isAddingNote === section.id && (
-                    <div className="px-2 pb-2">
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={newNoteTitle}
-                          onChange={(e) => setNewNoteTitle(e.target.value)}
-                          placeholder="Note title"
-                          className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                          onKeyDown={(e) => e.key === "Enter" && addNote(section.id)}
-                        />
-                        <Button size="sm" onClick={() => addNote(section.id)}>
-                          Add
+            <ScrollArea className="flex-1">
+              <div className="p-2 space-y-2">
+                {sections.map((section) => (
+                  <Collapsible
+                    key={section.id}
+                    open={section.isOpen}
+                    onOpenChange={() => toggleSection(section.id)}
+                    className="border rounded-md"
+                  >
+                    <div className="flex items-center justify-between p-2">
+                      <CollapsibleTrigger asChild>
+                        <Button variant="ghost" size="sm" className="p-1 h-auto">
+                          {section.isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                         </Button>
-                      </div>
-                    </div>
-                  )}
+                      </CollapsibleTrigger>
 
-                  <div className="space-y-1 p-2">
-                    {section.notes.map((note) => (
-                      <div
-                        key={note.id}
-                        className={cn(
-                          "flex items-center justify-between p-2 rounded-md cursor-pointer hover:bg-muted group",
-                          activeNote?.id === note.id && "bg-muted",
-                        )}
-                        onClick={() => setActiveNote(note)}
-                      >
-                        <div className="flex items-center">
-                          <FileText className="h-4 w-4 mr-2 text-muted-foreground" />
-                          <span className="text-sm">{note.title}</span>
-                        </div>
+                      <div className="font-medium flex-1 flex items-center">
+                        <Folder className="h-4 w-4 mr-2 text-muted-foreground" />
+                        {section.name}
+                      </div>
+
+                      <div className="flex">
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="p-1 h-auto opacity-0 group-hover:opacity-100 text-destructive"
+                          className="p-1 h-auto"
                           onClick={(e) => {
                             e.stopPropagation()
-                            deleteNote(note.id)
+                            setIsAddingNote(section.id)
+                          }}
+                        >
+                          <PlusCircle className="h-4 w-4" />
+                          <span className="sr-only">Add note</span>
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="ml-3 p-1 h-auto text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            deleteSection(section.id)
                           }}
                         >
                           <Trash2 className="h-4 w-4" />
-                          <span className="sr-only">Delete note</span>
+                          <span className="sr-only">Delete section</span>
                         </Button>
                       </div>
-                    ))}
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-            ))}
+                    </div>
+
+                    <CollapsibleContent>
+                      {isAddingNote === section.id && (
+                        <div className="px-2 pb-2">
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={newNoteTitle}
+                              onChange={(e) => setNewNoteTitle(e.target.value)}
+                              placeholder="Note title"
+                              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                              onKeyDown={(e) => e.key === "Enter" && addNote(section.id)}
+                            />
+                            <Button size="sm" onClick={() => addNote(section.id)}>
+                              Add
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="space-y-1 p-2">
+                        {section.notes.map((note) => (
+                          <div
+                            key={note.id}
+                            className={cn(
+                              "flex items-center justify-between p-2 rounded-md cursor-pointer hover:bg-muted group",
+                              activeNote?.id === note.id && "bg-muted",
+                            )}
+                            onClick={() => setActiveNote(note)}
+                          >
+                            <div className="flex items-center">
+                              <FileText className="h-4 w-4 mr-2 text-muted-foreground" />
+                              <span className="text-sm">{note.title}</span>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="p-1 h-auto opacity-0 group-hover:opacity-100 text-destructive"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                deleteNote(note.id)
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              <span className="sr-only">Delete note</span>
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                ))}
+              </div>
+            </ScrollArea>
           </div>
-        </ScrollArea>
-      </div>
 
-      {/* Resizer */}
-      <div
-        className="w-1 cursor-col-resize bg-border hover:bg-primary/50 active:bg-primary/90 transition-colors"
-        onMouseDown={startResizing}
-      />
+          {/* Resizer - Hide in focus mode */}
+          <div
+            className="w-1 cursor-col-resize bg-border hover:bg-primary/50 active:bg-primary/90 transition-colors flex-shrink-0"
+            onMouseDown={startResizing}
+          />
+        </>
+      )}
 
-      {/* Right panel with note editor */}
-      <div className="w-full flex flex-col h-full">
+      {/* Right panel with note editor - Full width in focus mode */}
+      <div className={cn(
+        "flex flex-col h-full min-w-0",
+        isFocusMode ? "w-full" : "flex-1"
+      )}>
         {activeNote ? (
           <>
-            <div className="p-4 border-b flex justify-between items-center">
-              <h2 className="text-xl font-semibold">{activeNote.title}</h2>
+            {/* Header - Show focus mode toggle and note title */}
+            <div className={cn(
+              "p-4 border-b flex justify-between items-center flex-shrink-0",
+              isFocusMode && "bg-background/80 backdrop-blur-sm"
+            )}>
+              <div className="flex items-center gap-4">
+                {isFocusMode && (
+                  <div className="text-sm text-muted-foreground">
+                    {activeNote.title}
+                  </div>
+                )}
+                {!isFocusMode && (
+                  <h2 className="text-xl font-semibold">{activeNote.title}</h2>
+                )}
+              </div>
+              
               <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">
-                  Last edited: {activeNote.lastEdited.toLocaleString()}
-                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={toggleFocusMode}
+                  className="gap-2"
+                >
+                  {isFocusMode ? (
+                    <>
+                      <Minimize className="h-4 w-4" />
+                      Exit Focus (ESC)
+                    </>
+                  ) : (
+                    <>
+                      <Maximize className="h-4 w-4" />
+                      Focus Mode (F11)
+                    </>
+                  )}
+                </Button>
+                {!isFocusMode && (
+                  <span className="text-sm text-muted-foreground">
+                    Last edited: {activeNote.lastEdited.toLocaleString()}
+                  </span>
+                )}
               </div>
             </div>
 
-            <div className="flex-1 overflow-hidden">
+            {/* Editor */}
+            <div className="flex-1 min-h-0 w-full">
               <LexicalEditor
                 key={activeNote.id}
                 noteId={activeNote.id}
@@ -374,10 +502,13 @@ export default function NotesApp() {
               />
             </div>
 
-            <div className="p-2 border-t text-sm text-muted-foreground flex justify-between">
-              <div>Characters: {characterCount}</div>
-              <div>Words: {wordCount}</div>
-            </div>
+            {/* Footer - Hide in focus mode */}
+            {!isFocusMode && (
+              <div className="p-2 border-t text-sm text-muted-foreground flex justify-between flex-shrink-0">
+                <div>Characters: {characterCount}</div>
+                <div>Words: {wordCount}</div>
+              </div>
+            )}
           </>
         ) : (
           <div className="flex items-center justify-center h-full text-muted-foreground">

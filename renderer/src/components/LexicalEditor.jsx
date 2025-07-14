@@ -386,19 +386,18 @@ export default function LexicalEditor({
 }) {
   return (
     <LexicalComposer initialConfig={{...editorConfig, editable: !readOnly}}>
-      <div className="lexical-editor-container flex flex-col h-full">
+      <div className="lexical-editor-container">
         {!readOnly && <Toolbar />}
         
-        <div className="lexical-editor-wrapper flex-1 relative">
+        <div className="lexical-editor-wrapper">
           <RichTextPlugin
             contentEditable={
               <ContentEditable 
-                className="lexical-content-editable h-full p-4 outline-none resize-none"
-                style={{ minHeight: 'calc(100vh - 200px)' }}
+                className="lexical-content-editable"
               />
             }
             placeholder={
-              <div className="lexical-placeholder absolute top-4 left-4 text-muted-foreground pointer-events-none">
+              <div className="lexical-placeholder">
                 {placeholder}
               </div>
             }

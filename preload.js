@@ -15,4 +15,9 @@ contextBridge.exposeInMainWorld('electron', {
   dbCreateNote: (id, sectionId, title, content) => ipcRenderer.invoke('db-create-note', id, sectionId, title, content),
   dbUpdateNote: (id, updates) => ipcRenderer.invoke('db-update-note', id, updates),
   dbDeleteNote: (id) => ipcRenderer.invoke('db-delete-note', id),
+
+   // Fullscreen APIs
+   toggleFullscreen: () => ipcRenderer.invoke('toggle-fullscreen'),
+   isFullscreen: () => ipcRenderer.invoke('is-fullscreen'),
+   exitFullscreen: () => ipcRenderer.invoke('exit-fullscreen') 
 });

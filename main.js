@@ -105,6 +105,31 @@ ipcMain.handle('db-delete-note', async (event, id) => {
   }
 });
 
+// Add fullscreen handlers
+ipcMain.handle('toggle-fullscreen', () => {
+  const mainWindow = BrowserWindow.getFocusedWindow();
+  if (mainWindow) {
+    const isFullScreen = mainWindow.isFullScreen();
+    mainWindow.setFullScreen(!isFullScreen);
+    return !isFullScreen;
+  }
+  return false;
+});
+
+ipcMain.handle('is-fullscreen', () => {
+  const mainWindow = BrowserWindow.getFocusedWindow();
+  return mainWindow ? mainWindow.isFullScreen() : false;
+});
+
+ipcMain.handle('exit-fullscreen', () => {
+  const mainWindow = BrowserWindow.getFocusedWindow();
+  if (mainWindow && mainWindow.isFullScreen()) {
+    mainWindow.setFullScreen(false);
+    return true;
+  }
+  return false;
+});
+
 
 app.whenReady().then(() => {
   createWindow()
