@@ -2,6 +2,10 @@ const { app, BrowserWindow, ipcMain, dialog } = require('electron')
 const fs = require('fs')
 const path = require('path')
 
+const DatabaseManager = require('./database/DatabaseManager') // Add this line
+
+let mainWindow;
+let dbManager;
 const createWindow = () => {
   const win = new BrowserWindow({
     width: 800,
@@ -15,36 +19,91 @@ const createWindow = () => {
   win.loadURL('http://localhost:5173') // This assumes you're using Vite for your frontend
 }
 
-// Listen for requests from renderer process to save notes to a file
-ipcMain.handle('save-notes', async (event, notesData) => {
-  const result = await dialog.showSaveDialog({
-    title: 'Save Notes',
-    defaultPath: 'notes.json',
-    filters: [{ name: 'JSON Files', extensions: ['json'] }]
-  })
+// Database operations
+ipcMain.handle('db-initialize', async (event, password) => {
+  try {
+    console.log('Initializing database...');
+    dbManager = new DatabaseManager();
+    const result = await dbManager.initialize(password);
+    console.log('Database initialization result:', result);
+    return result;
+  } catch (error) {
+    console.error('Database initialization error:', error);
+    return { success: false, error: error.message };
+  }
+});
 
-  if (result.canceled) return null
+ipcMain.handle('db-get-all-data', async () => {
+  try {
+    console.log('Getting all data...');
+    
+    if (!dbManager) {
+      throw new Error('Database manager not initialized');
+    }
+    
+    const data = dbManager.getAllData();
+    console.log('Retrieved data:', data);
+    return data;
+  } catch (error) {
+    console.error('Error getting data:', error);
+    throw error;
+  }
+});
 
-  // Save the notes to the selected file
-  const filePath = result.filePath
-  fs.writeFileSync(filePath, JSON.stringify(notesData, null, 2))
-  return filePath
-})
+ipcMain.handle('db-create-section', async (event, id, name) => {
+  try {
+    dbManager.createSection(id, name);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
 
-// Listen for requests from renderer process to load notes from a file
-ipcMain.handle('load-notes', async () => {
-  const result = await dialog.showOpenDialog({
-    title: 'Open Notes',
-    filters: [{ name: 'JSON Files', extensions: ['json'] }],
-    properties: ['openFile']
-  })
+ipcMain.handle('db-update-section', async (event, id, updates) => {
+  try {
+    dbManager.updateSection(id, updates);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
 
-  if (result.canceled) return null
+ipcMain.handle('db-delete-section', async (event, id) => {
+  try {
+    dbManager.deleteSection(id);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
 
-  const filePath = result.filePaths[0]
-  const notesData = fs.readFileSync(filePath, 'utf-8')
-  return JSON.parse(notesData)
-})
+ipcMain.handle('db-create-note', async (event, id, sectionId, title, content) => {
+  try {
+    dbManager.createNote(id, sectionId, title, content);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('db-update-note', async (event, id, updates) => {
+  try {
+    dbManager.updateNote(id, updates);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('db-delete-note', async (event, id) => {
+  try {
+    dbManager.deleteNote(id);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
 
 app.whenReady().then(() => {
   createWindow()
@@ -57,7 +116,10 @@ app.whenReady().then(() => {
 })
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit()
+  if (dbManager) {
+    dbManager.close();
   }
-})
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
+});

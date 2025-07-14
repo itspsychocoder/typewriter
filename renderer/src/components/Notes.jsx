@@ -1,62 +1,58 @@
 import { useState, useEffect } from "react"
-import { PlusCircle, FileText, Folder, ChevronDown, ChevronRight, Save, Trash2, Moon, Sun } from "lucide-react"
+import { PlusCircle, FileText, Folder, ChevronDown, ChevronRight, Save, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Textarea } from "@/components/ui/textarea"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { cn } from "@/lib/utils"
 
-
 export default function NotesApp() {
-  
-
   // Sidebar resizing
   const [sidebarWidth, setSidebarWidth] = useState(280)
   const [isResizing, setIsResizing] = useState(false)
   const minWidth = 180
   const maxWidth = 500
 
-  // Initial state with some example data
-  const [sections, setSections] = useState([
-    {
-      id: "section-1",
-      name: "Work",
-      isOpen: true,
-      notes: [
-        {
-          id: "note-1",
-          title: "Project Ideas",
-          content: "1. Create a new dashboard\n2. Implement dark mode\n3. Add analytics",
-          lastEdited: new Date(),
-        },
-        {
-          id: "note-2",
-          title: "Meeting Notes",
-          content: "Discussed timeline for Q3 projects and assigned tasks to team members.",
-          lastEdited: new Date(),
-        },
-      ],
-    },
-    {
-      id: "section-2",
-      name: "Personal",
-      isOpen: false,
-      notes: [
-        {
-          id: "note-3",
-          title: "Shopping List",
-          content: "- Milk\n- Eggs\n- Bread\n- Apples",
-          lastEdited: new Date(),
-        },
-      ],
-    },
-  ])
-
+  // State
+  const [sections, setSections] = useState([])
   const [activeNote, setActiveNote] = useState(null)
   const [newSectionName, setNewSectionName] = useState("")
   const [isAddingSection, setIsAddingSection] = useState(false)
   const [newNoteTitle, setNewNoteTitle] = useState("")
   const [isAddingNote, setIsAddingNote] = useState(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  // Initialize database and load data
+  useEffect(() => {
+    initializeApp();
+  }, []);
+
+  const initializeApp = async () => {
+    try {
+      setIsLoading(true);
+      // Initialize database
+      const result = await window.electron.dbInitialize();
+      console.log("Database initialization result:", result);
+      if (result.success) {
+        console.log("Database initialized successfully");
+        // Load existing data
+        await loadData();
+      }
+    } catch (error) {
+      console.error('Failed to initialize app:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadData = async () => {
+    try {
+      const data = await window.electron.dbGetAllData();
+      setSections(data);
+    } catch (error) {
+      console.error('Failed to load data:', error);
+    }
+  };
 
   // Handle sidebar resizing
   const startResizing = () => {
@@ -85,62 +81,74 @@ export default function NotesApp() {
     }
   }, [isResizing])
 
-  const saveNotes = async () => {
-    const filePath = await window.electron.saveNotes(sections);
-    if (filePath) {
-      console.log('Notes saved at:', filePath);
+  // Function to toggle section collapse
+  const toggleSection = async (sectionId) => {
+    const section = sections.find(s => s.id === sectionId);
+    if (section) {
+      await window.electron.dbUpdateSection(sectionId, { is_open: !section.isOpen });
+      setSections(
+        sections.map((section) => 
+          section.id === sectionId ? { ...section, isOpen: !section.isOpen } : section
+        )
+      )
     }
   }
 
-  // Function to toggle section collapse
-  const toggleSection = (sectionId) => {
-    setSections(
-      sections.map((section) => (section.id === sectionId ? { ...section, isOpen: !section.isOpen } : section)),
-    )
-  }
-
   // Function to add a new section
-  const addSection = () => {
+  const addSection = async () => {
     if (newSectionName.trim()) {
-      const newSection = {
-        id: `section-${Date.now()}`,
-        name: newSectionName,
-        isOpen: true,
-        notes: [],
+      const newSectionId = `section-${Date.now()}`;
+      const result = await window.electron.dbCreateSection(newSectionId, newSectionName);
+      console.log("New section created:", result);
+      if (result.success) {
+        const newSection = {
+          id: newSectionId,
+          name: newSectionName,
+          isOpen: true,
+          notes: [],
+        }
+        setSections([...sections, newSection])
+        setNewSectionName("")
+        setIsAddingSection(false)
       }
-      setSections([...sections, newSection])
-      setNewSectionName("")
-      setIsAddingSection(false)
     }
   }
 
   // Function to add a new note to a section
-  const addNote = (sectionId) => {
+  const addNote = async (sectionId) => {
     if (newNoteTitle.trim()) {
-      const newNote = {
-        id: `note-${Date.now()}`,
-        title: newNoteTitle,
-        content: "",
-        lastEdited: new Date(),
+      const newNoteId = `note-${Date.now()}`;
+      const result = await window.electron.dbCreateNote(newNoteId, sectionId, newNoteTitle, "");
+
+      if (result.success) {
+        const newNote = {
+          id: newNoteId,
+          title: newNoteTitle,
+          content: "",
+          lastEdited: new Date(),
+        }
+
+        setSections(
+          sections.map((section) =>
+            section.id === sectionId ? { ...section, notes: [...section.notes, newNote] } : section,
+          ),
+        )
+
+        setNewNoteTitle("")
+        setIsAddingNote(null)
+        setActiveNote(newNote)
       }
-
-      setSections(
-        sections.map((section) =>
-          section.id === sectionId ? { ...section, notes: [...section.notes, newNote] } : section,
-        ),
-      )
-
-      setNewNoteTitle("")
-      setIsAddingNote(null)
-      setActiveNote(newNote)
     }
   }
 
   // Function to update note content
-  const updateNoteContent = (content) => {
+  const updateNoteContent = async (content) => {
     if (activeNote) {
       const updatedNote = { ...activeNote, content, lastEdited: new Date() }
       setActiveNote(updatedNote)
+
+      // Update in database
+      await window.electron.dbUpdateNote(activeNote.id, { content });
 
       setSections(
         sections.map((section) => ({
@@ -152,27 +160,35 @@ export default function NotesApp() {
   }
 
   // Function to delete a note
-  const deleteNote = (noteId) => {
-    setSections(
-      sections.map((section) => ({
-        ...section,
-        notes: section.notes.filter((note) => note.id !== noteId),
-      })),
-    )
+  const deleteNote = async (noteId) => {
+    const result = await window.electron.dbDeleteNote(noteId);
+    
+    if (result.success) {
+      setSections(
+        sections.map((section) => ({
+          ...section,
+          notes: section.notes.filter((note) => note.id !== noteId),
+        })),
+      )
 
-    if (activeNote?.id === noteId) {
-      setActiveNote(null)
+      if (activeNote?.id === noteId) {
+        setActiveNote(null)
+      }
     }
   }
 
   // Function to delete a section
-  const deleteSection = (sectionId) => {
-    setSections(sections.filter((section) => section.id !== sectionId))
+  const deleteSection = async (sectionId) => {
+    const result = await window.electron.dbDeleteSection(sectionId);
+    
+    if (result.success) {
+      setSections(sections.filter((section) => section.id !== sectionId))
 
-    // If active note was in this section, clear it
-    const sectionToDelete = sections.find((s) => s.id === sectionId)
-    if (sectionToDelete && activeNote && sectionToDelete.notes.some((n) => n.id === activeNote.id)) {
-      setActiveNote(null)
+      // If active note was in this section, clear it
+      const sectionToDelete = sections.find((s) => s.id === sectionId)
+      if (sectionToDelete && activeNote && sectionToDelete.notes.some((n) => n.id === activeNote.id)) {
+        setActiveNote(null)
+      }
     }
   }
 
@@ -180,12 +196,21 @@ export default function NotesApp() {
   const characterCount = activeNote?.content.length || 0
   const wordCount = activeNote?.content.trim() ? activeNote.content.trim().split(/\s+/).length : 0
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p>Loading TypeWriter...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen bg-background">
       {/* Left sidebar with sections and notes */}
       <div className="border-r flex flex-col h-full bg-background" style={{ width: `${sidebarWidth}px` }}>
-        
-
         <div className="p-2">
           <Button variant="ghost" className="w-full justify-start" onClick={() => setIsAddingSection(true)}>
             <PlusCircle className="h-4 w-4 mr-2" />
@@ -248,7 +273,7 @@ export default function NotesApp() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="p-1 h-auto text-destructive"
+                      className="ml-3 p-1 h-auto text-destructive"
                       onClick={(e) => {
                         e.stopPropagation()
                         deleteSection(section.id)
@@ -322,19 +347,15 @@ export default function NotesApp() {
       />
 
       {/* Right panel with note editor */}
-      <div className="flex-1 flex flex-col h-full">
+      <div className="w-full flex flex-col h-full">
         {activeNote ? (
           <>
-            <div className="p-4 border-b flex justify-between items-center">
+            <div className="p-4 w-[70vw] border-b flex justify-between items-center">
               <h2 className="text-xl font-semibold">{activeNote.title}</h2>
               <div className="flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">
                   Last edited: {activeNote.lastEdited.toLocaleString()}
                 </span>
-                <Button onClick={saveNotes} size="sm" variant="outline">
-                  <Save className="h-4 w-4 mr-2" />
-                  Save
-                </Button>
               </div>
             </div>
 

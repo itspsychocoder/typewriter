@@ -5,8 +5,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "electron .",
-    "dev": "concurrently \"npm run dev --prefix renderer\" \"wait-on http://localhost:5173 && electron .\""
-
+    "dev": "concurrently \"npm run dev --prefix renderer\" \"wait-on http://localhost:5173 && electron .\"",
+    "postinstall": "electron-rebuild"
 
   },
   "repository": {
@@ -24,6 +24,8 @@
     "electron": "^35.2.0"
   },
   "dependencies": {
+    "@electron/rebuild": "^4.0.1",
+    "better-sqlite3": "^12.2.0",
     "concurrently": "^9.1.2",
     "wait-on": "^8.0.3"
   }
